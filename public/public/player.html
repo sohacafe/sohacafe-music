@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Müzik Kontrol - Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .container {
+            background: #2d2d2d;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        
+        header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+        }
+        
+        body.dark-mode header {
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+        }
+        
+        header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            font-size: 0.95em;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: white;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+        
+        .theme-toggle:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+        
+        .current-track {
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .current-track {
+            background: #3d3d3d;
+            border-bottom-color: #555;
+        }
+        
+        .track-info {
+            text-align: center;
+        }
+        
+        .track-title {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .track-title {
+            color: #ffffff;
+        }
+        
+        .track-artist {
+            font-size: 1.1em;
+            color: #666;
+            margin-bottom: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .track-artist {
+            color: #cccccc;
+        }
+        
+        .track-user {
+            font-size: 0.9em;
+            color: #888;
+            font-style: italic;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .track-user {
+            color: #aaaaaa;
+        }
+        
+        .progress-container {
+            background: #e9ecef;
+            height: 8px;
+            border-radius: 4px;
+            margin: 20px 0 10px 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .progress-container {
+            background: #555;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, #28a745, #20c997);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-time {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .progress-time {
+            color: #cccccc;
+        }
+        
+        .player-controls {
+            display: flex;
+            gap: 12px;
+            margin: 25px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-btn {
+            padding: 14px 28px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .play-btn { background: #28a745; color: white; }
+        .pause-btn { background: #ffc107; color: black; }
+        .next-btn { background: #007bff; color: white; }
+        .stop-btn { background: #dc3545; color: white; }
+        
+        .queue-section {
+            padding: 25px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .queue-section {
+            background: #2d2d2d;
+        }
+        
+        .queue-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .queue-section h3 {
+            color: #ffffff;
+        }
+        
+        .queue-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .queue-item {
+            background: #3d3d3d;
+            border-color: #555;
+            color: #ffffff;
+        }
+        
+        .queue-item:hover {
+            background: #f8f9fa;
+            transform: translateX(5px);
+        }
+        
+        body.dark-mode .queue-item:hover {
+            background: #4d4d4d;
+        }
+        
+        .queue-position {
+            background: #007bff;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .empty-queue {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-style: italic;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .empty-queue {
+            color: #aaaaaa;
+        }
+        
+        .admin-links {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark-mode .admin-links {
+            background: #3d3d3d;
+        }
+        
+        .admin-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 0 10px;
+            transition: background 0.3s ease;
+        }
+        
+        .admin-link:hover {
+            background: #545b62;
+        }
+        
+        .playing-indicator {
+            color: #28a745;
+            font-weight: bold;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="theme-toggle" onclick="toggleDarkMode()">🌙</button>
+            <h1>🎵 Müzik Kontrol Paneli</h1>
+            <div class="status-bar">
+                <span id="userCount">0 kullanıcı</span>
+                <span id="queueCount">0 parça</span>
+                <span id="playerStatus">Duraklatıldı</span>
+            </div>
+        </header>
+
+        <div class="current-track">
+            <div class="track-info">
+                <div class="track-title" id="trackTitle">Parça seçilmedi</div>
+                <div class="track-artist" id="trackArtist"></div>
+                <div class="track-user" id="trackUser"></div>
+                
+                <!-- SES KONTROLÜ TAMAMEN KALDIRILDI -->
+                
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-time">
+                    <span id="currentTime">0:00</span>
+                    <span id="totalTime">3:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="player-controls">
+            <button class="control-btn play-btn" onclick="controlPlayer('play')">▶ Çal</button>
+            <button class="control-btn pause-btn" onclick="controlPlayer('pause')">⏸ Duraklat</button>
+            <button class="control-btn next-btn" onclick="controlPlayer('next')">⏭ Sonraki</button>
+            <button class="control-btn stop-btn" onclick="controlPlayer('stop')">⏹ Durdur</button>
+        </div>
+
+        <div class="queue-section">
+            <h3>📋 Sıradaki Parçalar (<span id="queueLength">0</span>)</h3>
+            <div id="queueList" class="queue-list">
+                <div class="empty-queue">Kuyruk boş</div>
+            </div>
+        </div>
+
+        <div class="admin-links">
+            <a href="/admin/qr" class="admin-link">🔧 QR Kod Yönetimi</a>
+            <a href="/" class="admin-link">📱 Kullanıcı Görünümü</a>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let progressInterval;
+
+        // Sayfa yüklendiğinde
+        window.addEventListener('load', function() {
+            loadCurrentStatus();
+            loadThemePreference();
+        });
+
+        // Gece modu
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode);
+            
+            // Buton ikonunu değiştir
+            const themeButton = document.querySelector('.theme-toggle');
+            themeButton.textContent = isDarkMode ? '☀️' : '🌙';
+        }
+
+        function loadThemePreference() {
+            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+                document.querySelector('.theme-toggle').textContent = '☀️';
+            }
+        }
+
+        // Mevcut durumu yükle
+        async function loadCurrentStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                if (data.success) {
+                    updateDisplay(data);
+                }
+            } catch (error) {
+                console.error('Yükleme hatası:', error);
+            }
+        }
+
+        // Player kontrolü
+        async function controlPlayer(action) {
+            try {
+                const response = await fetch('/api/player/' + action, { 
+                    method: 'POST' 
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Hata: ' + (data.message || 'Bilinmeyen hata'));
+                }
+            } catch (error) {
+                console.error('Kontrol hatası:', error);
+                alert('İşlem sırasında hata oluştu');
+            }
+        }
+
+        // Görünümü güncelle
+        function updateDisplay(data) {
+            // Şu anki parça
+            const trackTitle = document.getElementById('trackTitle');
+            const trackArtist = document.getElementById('trackArtist');
+            const trackUser = document.getElementById('trackUser');
+            
+            if (data.currentTrack) {
+                trackTitle.textContent = data.currentTrack.track.title;
+                trackArtist.textContent = data.currentTrack.track.artist;
+                trackUser.textContent = 'Ekleyen: ' + data.currentTrack.user;
+                
+                // Progress bar'ı başlat
+                startProgressBar();
+            } else {
+                trackTitle.textContent = 'Parça seçilmedi';
+                trackArtist.textContent = '';
+                trackUser.textContent = '';
+                resetProgressBar();
+            }
+
+            // Kuyruk
+            const queueList = document.getElementById('queueList');
+            const queueLength = document.getElementById('queueLength');
+            
+            queueLength.textContent = data.queue.length;
+            
+            if (data.queue.length === 0) {
+                queueList.innerHTML = '<div class="empty-queue">Kuyruk boş</div>';
+            } else {
+                queueList.innerHTML = data.queue.map((item, index) => `
+                    <div class="queue-item">
+                        <div style="flex: 1;">
+                            <strong>${item.track.title}</strong>
+                            <div style="color: #666; font-size: 0.9em; margin-top: 5px;">
+                                ${item.track.artist} • ${item.user}
+                            </div>
+                        </div>
+                        <div class="queue-position">#${index + 1}</div>
+                    </div>
+                `).join('');
+            }
+
+            // Oynatıcı durumu
+            const playerStatus = document.getElementById('playerStatus');
+            if (data.isPlaying) {
+                playerStatus.innerHTML = '<span class="playing-indicator">▶ Çalınıyor</span>';
+            } else {
+                playerStatus.textContent = '⏸ Duraklatıldı';
+            }
+
+            // Kullanıcı sayısı
+            document.getElementById('userCount').textContent = (data.totalUsers || 0) + ' kullanıcı';
+            document.getElementById('queueCount').textContent = data.queue.length + ' parça';
+        }
+
+        // Progress bar
+        function startProgressBar() {
+            resetProgressBar();
+            
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const currentTime = document.getElementById('currentTime');
+            
+            progressInterval = setInterval(() => {
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+                
+                progress += 0.33; // Yaklaşık 3 dakika için
+                progressBar.style.width = progress + '%';
+                
+                // Zamanı güncelle
+                const totalSeconds = 180; // 3 dakika
+                const currentSeconds = Math.floor((progress / 100) * totalSeconds);
+                const minutes = Math.floor(currentSeconds / 60);
+                const seconds = currentSeconds % 60;
+                currentTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+            }, 1000);
+        }
+
+        function resetProgressBar() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('currentTime').textContent = '0:00';
+        }
+
+        // Socket events
+        socket.on('queueUpdate', function(data) {
+            updateDisplay(data);
+        });
+
+        socket.on('playerState', function(data) {
+            updateDisplay(data);
+        });
+
+        socket.on('trackChanged', function(data) {
+            updateDisplay(data);
+        });
+
+        socket.on('connect', function() {
+            console.log('Player bağlandı');
+        });
+    </script>
+</body>
+</html>
