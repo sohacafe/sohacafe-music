@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mekan Müzik Sistemi</title>
+    <style>
+        /* Önceki stilleri koru, sadece eklemeler yap */
+        .access-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            display: none;
+        }
+        
+        .venue-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="venue-status" id="venueStatus">📍 Mekan İçi</div>
+    
+    <div class="access-warning" id="accessWarning">
+        ⚠️ <strong>Mekan Dışı Erişim!</strong> Sadece mekan içinden müzik isteği yapabilirsiniz.
+    </div>
+    
+    <!-- Mevcut içerik burada kalacak -->
+    
+    <script>
+        // Mekan erişim kontrolü
+        async function checkVenueAccess() {
+            try {
+                const response = await fetch('/api/session/check');
+                const data = await response.json();
+                
+                if (!data.isValid) {
+                    showAccessWarning('Geçersiz oturum. Lütfen QR kodunu tekrar okutun.');
+                    return false;
+                }
+                
+                // Erişim testi yap
+                const statusResponse = await fetch('/api/status');
+                if (!statusResponse.ok) {
+                    showAccessWarning('Mekan erişimi yok. Lütfen mekan WiFi\'sına bağlanın.');
+                    return false;
+                }
+                
+                hideAccessWarning();
+                return true;
+                
+            } catch (error) {
+                showAccessWarning('Mekan erişimi kontrol edilemiyor. WiFi bağlantınızı kontrol edin.');
+                return false;
+            }
+        }
+        
+        function showAccessWarning(message) {
+            const warning = document.getElementById('accessWarning');
+            const status = document.getElementById('venueStatus');
+            
+            warning.innerHTML = `⚠️ <strong>Erişim Kısıtlandı!</strong> ${message}`;
+            warning.style.display = 'block';
+            status.style.background = '#dc3545';
+            status.textContent = '📍 Mekan Dışı';
+        }
+        
+        function hideAccessWarning() {
+            const warning = document.getElementById('accessWarning');
+            const status = document.getElementById('venueStatus');
+            
+            warning.style.display = 'none';
+            status.style.background = '#28a745';
+            status.textContent = '📍 Mekan İçi';
+        }
+        
+        // Sayfa yüklendiğinde kontrol et
+        document.addEventListener('DOMContentLoaded', function() {
+            checkVenueAccess();
+            setInterval(checkVenueAccess, 30000); // 30 saniyede bir kontrol et
+        });
+        
+        // Tüm API isteklerinden önce erişim kontrolü
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const url = args[0];
+            
+            // Session gerektiren endpoint'ler
+            if (url.includes('/api/') && !url.includes('/api/session/check') && !url.includes('/api/status')) {
+                const hasAccess = await checkVenueAccess();
+                if (!hasAccess) {
+                    throw new Error('Mekan erişimi yok');
+                }
+            }
+            
+            return originalFetch.apply(this, args);
+        };
+    </script>
+</body>
+</html>
