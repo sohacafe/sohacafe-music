@@ -324,7 +324,7 @@ app.get('/api/qr/generate', async (req, res) => {
       sessionId: session.id,
       action: 'join-venue',
       timestamp: Date.now(),
-      baseUrl: `https://sohacafe.onrender.com`
+      baseUrl: `https://sohacafe.onrender.com` // BU SATIRI KONTROL ET!
     };
     
     const qrCodeUrl = await QRCode.toDataURL(JSON.stringify(qrData));
@@ -338,7 +338,7 @@ app.get('/api/qr/generate', async (req, res) => {
         isValid: session.isValid
       },
       qrCode: qrCodeUrl,
-      directUrl: `https://sohacafe.onrender.com/join/${session.id}`,
+      directUrl: `https://sohacafe.onrender.com/join/${session.id}`, // BU DA
       expiryTime: session.expiresAt
     });
   } catch (error) {
@@ -611,4 +611,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎵 SOHACAFE MÜZİK SİSTEMİ RENDER'DA ÇALIŞIYOR!`);
   console.log(`📱 URL: https://sohacafe.onrender.com`);
 });
+
 
