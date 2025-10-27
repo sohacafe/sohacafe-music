@@ -140,6 +140,75 @@
             color: white; 
         }
         
+        .control-method-selector {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .method-option {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .method-option:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+        
+        .method-option.selected {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+        
+        .method-radio {
+            margin-right: 10px;
+        }
+        
+        .method-info {
+            flex: 1;
+        }
+        
+        .method-title {
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        .method-desc {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-top: 5px;
+        }
+        
+        .gps-settings {
+            background: #f0fff4;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #c6f6d5;
+        }
+        
+        .coord-input {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .coord-input input {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        
         .toggle-group {
             display: flex;
             flex-direction: column;
@@ -220,7 +289,7 @@
         }
         
         #qrCode {
-            max-width: 300px;
+                    max-width: 300px;
             width: 100%;
             height: auto;
         }
@@ -324,6 +393,28 @@
             font-family: monospace;
         }
         
+        /* Kullanıcı Yönetimi Linki */
+        .admin-links {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .admin-link {
+            background: #805ad5;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        
+        .admin-link:hover {
+            background: #6b46c1;
+        }
+        
         /* Responsive */
         @media (max-width: 480px) {
             .card {
@@ -379,8 +470,14 @@
     <div class="container">
         <header>
             <h1>🏢 Mekan Yönetim Paneli</h1>
-            <p>Akıllı Müzik Paylaşım Sistemi - Version 2.0</p>
+            <p>Akıllı Müzik Paylaşım Sistemi - Version 3.0</p>
         </header>
+        
+        <div class="admin-links">
+            <a href="/admin/login" class="admin-link">🔐 Admin Girişi</a>
+            <a href="/admin/users" class="admin-link">👥 Kullanıcı Yönetimi</a>
+            <a href="/" class="admin-link">📱 Kullanıcı Arayüzü</a>
+        </div>
         
         <div class="dashboard">
             <!-- İstatistikler Kartı -->
@@ -400,8 +497,8 @@
                         <span class="stat-label">Aktif Oturum</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" id="venueStatus">🟢</span>
-                        <span class="stat-label">Mekan Durumu</span>
+                        <span class="stat-number" id="gpsVerified">0</span>
+                        <span class="stat-label">GPS Doğrulanan</span>
                     </div>
                 </div>
                 
@@ -412,12 +509,12 @@
                         <span class="info-value" id="venueControlStatus">Aktif</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">WiFi Kontrolü:</span>
-                        <span class="info-value" id="wifiControlStatus">Aktif</span>
+                        <span class="info-label">Kontrol Yöntemi:</span>
+                        <span class="info-value" id="controlMethod">GPS</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">IP Kontrolü:</span>
-                        <span class="info-value" id="ipControlStatus">Aktif</span>
+                        <span class="info-label">Mekan Durumu:</span>
+                        <span class="info-value" id="venueStatus">🟢 Aktif</span>
                     </div>
                 </div>
             </div>
@@ -431,27 +528,60 @@
                     <span class="status-badge status-active" id="venueStatusBadge">AKTİF</span>
                 </div>
                 
+                <div class="control-method-selector">
+                    <h4>Kontrol Yöntemi Seçin:</h4>
+                    
+                    <div class="method-option" onclick="selectControlMethod('gps')">
+                        <input type="radio" name="controlMethod" class="method-radio" id="methodGps">
+                        <div class="method-info">
+                            <div class="method-title">📍 GPS Konum Kontrolü</div>
+                            <div class="method-desc">Kullanıcıların mekan içinde olduğunu GPS ile doğrula</div>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" onclick="selectControlMethod('wifi')">
+                        <input type="radio" name="controlMethod" class="method-radio" id="methodWifi">
+                        <div class="method-info">
+                            <div class="method-title">📶 WiFi Ağ Kontrolü</div>
+                            <div class="method-desc">Sadece mekan WiFi'sına bağlı cihazlara izin ver</div>
+                        </div>
+                    </div>
+                    
+                    <div class="method-option" onclick="selectControlMethod('none')">
+                        <input type="radio" name="controlMethod" class="method-radio" id="methodNone">
+                        <div class="method-info">
+                            <div class="method-title">🔓 Kontrol Yok</div>
+                            <div class="method-desc">Herkes erişebilir (test için)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="gps-settings" id="gpsSettings">
+                        <h5>📍 GPS Ayarları</h5>
+                        <div class="coord-input">
+                            <div>
+                                <label>Enlem (Latitude)</label>
+                                <input type="number" id="venueLat" step="any" placeholder="41.0082">
+                            </div>
+                            <div>
+                                <label>Boylam (Longitude)</label>
+                                <input type="number" id="venueLng" step="any" placeholder="28.9784">
+                            </div>
+                        </div>
+                        <div>
+                            <label>Yarıçap (Metre)</label>
+                            <input type="number" id="venueRadius" value="100" min="10" max="1000">
+                        </div>
+                        <button class="btn btn-success btn-sm" onclick="saveGPSSettings()" style="margin-top: 10px;">
+                            📍 Konumu Kaydet
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="toggle-group">
                     <div class="toggle-item">
                         <span class="toggle-label">Mekan Erişim Kontrolü</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="venueAccessToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    
-                    <div class="toggle-item">
-                        <span class="toggle-label">WiFi Erişim Kontrolü</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="wifiControlToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    
-                    <div class="toggle-item">
-                        <span class="toggle-label">IP Erişim Kontrolü</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="ipControlToggle" checked>
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -468,8 +598,8 @@
                 <h2>📱 QR Kod Yönetimi</h2>
                 
                 <div class="qr-info">
-                    <p><strong>🎯 SABİT QR KOD SİSTEMİ</strong></p>
-                    <p>Bu QR kod 1 YIL geçerlidir. Müşteriler sadece mekan içindeyken kullanabilir.</p>
+                    <p><strong>🎯 AKILLI QR KOD SİSTEMİ</strong></p>
+                    <p>QR kodlar 24 saat geçerlidir. Mekan kontrolüne göre erişim sağlar.</p>
                 </div>
                 
                 <div class="qr-container">
@@ -479,7 +609,8 @@
                 <div class="session-info">
                     <p><strong>Oturum ID:</strong></p>
                     <div class="session-id" id="sessionId">Yükleniyor...</div>
-                    <p><strong>Geçerlilik:</strong> <span id="expiryInfo">1 YIL</span></p>
+                    <p><strong>Geçerlilik:</strong> <span id="expiryInfo">24 Saat</span></p>
+                    <p><strong>Direct URL:</strong> <span id="directUrl" style="word-break: break-all; font-size: 0.9rem;"></span></p>
                 </div>
                 
                 <div class="action-buttons">
@@ -492,12 +623,15 @@
                     <button class="btn btn-secondary" onclick="copySessionId()">
                         📋 ID'yi Kopyala
                     </button>
+                    <button class="btn btn-secondary" onclick="copyDirectUrl()">
+                        🔗 URL'yi Kopyala
+                    </button>
                 </div>
             </div>
             
             <!-- Hızlı Erişim Kartı -->
             <div class="card">
-                <h2>🚀 Hızlı Erişim</h2>
+                <h2>🚀 Hızlı Erişim & Test</h2>
                 <div class="action-buttons">
                     <button class="btn" onclick="openPlayer()">🎵 Müzik Player</button>
                     <button class="btn" onclick="openUserApp()">📱 Kullanıcı Uygulaması</button>
@@ -507,9 +641,10 @@
                 <div style="margin-top: 20px; padding: 15px; background: #f7fafc; border-radius: 8px;">
                     <h4>📖 Kullanım Kılavuzu:</h4>
                     <ul style="margin-left: 20px; margin-top: 10px;">
-                        <li>Mekan kontrolü AKTİF iken sadece WiFi'ya bağlı cihazlar erişebilir</li>
-                        <li>QR kod her zaman geçerlidir (1 yıl)</li>
-                        <li>Müşteriler mekandan çıkınca otomatik olarak engellenir</li>
+                        <li><strong>GPS Kontrolü:</strong> Kullanıcılar konum paylaşmalı</li>
+                        <li><strong>WiFi Kontrolü:</strong> Sadece mekan WiFi'sı</li>
+                        <li><strong>Kontrol Yok:</strong> Herkes erişebilir</li>
+                        <li>QR kodlar 24 saat geçerli</li>
                     </ul>
                 </div>
             </div>
@@ -533,6 +668,44 @@
             setInterval(refreshStats, 10000);
         });
         
+        // Kontrol yöntemi seçimi
+        function selectControlMethod(method) {
+            document.querySelectorAll('.method-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            
+            event.currentTarget.classList.add('selected');
+            document.getElementById(`method${method.charAt(0).toUpperCase() + method.slice(1)}`).checked = true;
+            
+            // GPS ayarlarını göster/gizle
+            document.getElementById('gpsSettings').style.display = method === 'gps' ? 'block' : 'none';
+            
+            currentSettings.controlMethod = method;
+        }
+        
+        // GPS ayarlarını kaydet
+        async function saveGPSSettings() {
+            const lat = parseFloat(document.getElementById('venueLat').value);
+            const lng = parseFloat(document.getElementById('venueLng').value);
+            const radius = parseInt(document.getElementById('venueRadius').value);
+            
+            if (!lat || !lng) {
+                showNotification('❌ Lütfen geçerli koordinatlar girin', 'error');
+                return;
+            }
+            
+            const settings = {
+                venueLocation: {
+                    lat: lat,
+                    lng: lng,
+                    radius: radius
+                }
+            };
+            
+            await saveSettingsToServer(settings);
+            showNotification('✅ Mekan konumu kaydedildi!', 'success');
+        }
+        
         // Ayarları yükle
         async function loadSettings() {
             try {
@@ -551,8 +724,16 @@
         // UI'yı güncelle
         function updateSettingsUI() {
             document.getElementById('venueAccessToggle').checked = currentSettings.isActive;
-            document.getElementById('wifiControlToggle').checked = currentSettings.checkWiFi;
-            document.getElementById('ipControlToggle').checked = currentSettings.checkIP;
+            
+            // Kontrol yöntemi seçimi
+            selectControlMethod(currentSettings.controlMethod || 'gps');
+            
+            // GPS ayarları
+            if (currentSettings.venueLocation) {
+                document.getElementById('venueLat').value = currentSettings.venueLocation.lat;
+                document.getElementById('venueLng').value = currentSettings.venueLocation.lng;
+                document.getElementById('venueRadius').value = currentSettings.venueLocation.radius;
+            }
             
             updateStatusBadge();
         }
@@ -573,10 +754,13 @@
         async function saveSettings() {
             const settings = {
                 isActive: document.getElementById('venueAccessToggle').checked,
-                checkWiFi: document.getElementById('wifiControlToggle').checked,
-                checkIP: document.getElementById('ipControlToggle').checked
+                controlMethod: currentSettings.controlMethod || 'gps'
             };
             
+            await saveSettingsToServer(settings);
+        }
+        
+        async function saveSettingsToServer(settings) {
             try {
                 const response = await fetch('/api/admin/settings', {
                     method: 'POST',
@@ -601,27 +785,25 @@
         }
         
         // QR kod oluştur
-// QR kod oluşturma fonksiyonunu bul ve DEĞİŞTİR:
-async function generateQRCode() {
-  try {
-    const response = await fetch('/api/qr/generate');
-    const data = await response.json();
-    
-    if (data.success) {
-      currentSession = data.session;
-      document.getElementById('qrCode').src = data.qrCode;
-      document.getElementById('sessionId').textContent = data.session.id;
-      document.getElementById('expiryInfo').textContent = 
-        new Date(data.session.expiresAt).toLocaleDateString('tr-TR');
-      
-      // YENİ EKLEDİĞİM KOD - QR kod içeriğini kontrol et
-      console.log('QR Kod URL:', data.directUrl);
-      showNotification('✅ Yeni QR kod oluşturuldu!', 'success');
-    }
-  } catch (error) {
-    showNotification('❌ QR kod oluşturulamadı: ' + error.message, 'error');
-  }
-}
+        async function generateQRCode() {
+            try {
+                const response = await fetch('/api/qr/generate');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = data.session;
+                    document.getElementById('qrCode').src = data.qrCode;
+                    document.getElementById('sessionId').textContent = data.session.id;
+                    document.getElementById('directUrl').textContent = data.directUrl;
+                    document.getElementById('expiryInfo').textContent = 
+                        '24 Saat'; // Sabit 24 saat
+                    
+                    showNotification('✅ Yeni QR kod oluşturuldu!', 'success');
+                }
+            } catch (error) {
+                showNotification('❌ QR kod oluşturulamadı: ' + error.message, 'error');
+            }
+        }
         
         // İstatistikleri yenile
         async function refreshStats() {
@@ -634,16 +816,14 @@ async function generateQRCode() {
                     document.getElementById('activeUsers').textContent = stats.totalUsers;
                     document.getElementById('queueLength').textContent = stats.queueLength;
                     document.getElementById('activeSessions').textContent = stats.activeSessions;
-                    document.getElementById('venueStatus').textContent = 
-                        stats.venueStatus.includes('Aktif') ? '🟢' : '🔴';
+                    document.getElementById('gpsVerified').textContent = stats.gpsVerified;
                     
                     // Sistem bilgilerini güncelle
                     document.getElementById('venueControlStatus').textContent = 
                         currentSettings.isActive ? 'Aktif' : 'Kapalı';
-                    document.getElementById('wifiControlStatus').textContent = 
-                        currentSettings.checkWiFi ? 'Aktif' : 'Kapalı';
-                    document.getElementById('ipControlStatus').textContent = 
-                        currentSettings.checkIP ? 'Aktif' : 'Kapalı';
+                    document.getElementById('controlMethod').textContent = 
+                        stats.controlMethod || 'GPS';
+                    document.getElementById('venueStatus').textContent = stats.venueStatus;
                 }
             } catch (error) {
                 console.error('İstatistik yüklenemedi:', error);
@@ -679,6 +859,16 @@ async function generateQRCode() {
             }
         }
         
+        // Direct URL kopyala
+        function copyDirectUrl() {
+            const directUrl = document.getElementById('directUrl').textContent;
+            if (directUrl && directUrl !== 'Yükleniyor...') {
+                navigator.clipboard.writeText(directUrl)
+                    .then(() => showNotification('✅ URL kopyalandı!', 'success'))
+                    .catch(() => showNotification('❌ Kopyalama başarısız', 'error'));
+            }
+        }
+        
         // Bildirim göster
         function showNotification(message, type) {
             const notification = document.getElementById('notification');
@@ -706,7 +896,7 @@ async function generateQRCode() {
                     if (data.success) {
                         showNotification('✅ Erişim testi başarılı!', 'success');
                     } else {
-                        showNotification('❌ Erişim testi başarısız', 'error');
+                        showNotification('❌ Erişim testi başarısız: ' + data.error, 'error');
                     }
                 })
                 .catch(() => {
@@ -715,5 +905,4 @@ async function generateQRCode() {
         }
     </script>
 </body>
-
 </html>
