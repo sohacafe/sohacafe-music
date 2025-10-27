@@ -601,24 +601,27 @@
         }
         
         // QR kod oluştur
-        async function generateQRCode() {
-            try {
-                const response = await fetch('/api/qr/generate');
-                const data = await response.json();
-                
-                if (data.success) {
-                    currentSession = data.session;
-                    document.getElementById('qrCode').src = data.qrCode;
-                    document.getElementById('sessionId').textContent = data.session.id;
-                    document.getElementById('expiryInfo').textContent = 
-                        new Date(data.session.expiresAt).toLocaleDateString('tr-TR');
-                    
-                    showNotification('✅ Yeni QR kod oluşturuldu!', 'success');
-                }
-            } catch (error) {
-                showNotification('❌ QR kod oluşturulamadı: ' + error.message, 'error');
-            }
-        }
+// QR kod oluşturma fonksiyonunu bul ve DEĞİŞTİR:
+async function generateQRCode() {
+  try {
+    const response = await fetch('/api/qr/generate');
+    const data = await response.json();
+    
+    if (data.success) {
+      currentSession = data.session;
+      document.getElementById('qrCode').src = data.qrCode;
+      document.getElementById('sessionId').textContent = data.session.id;
+      document.getElementById('expiryInfo').textContent = 
+        new Date(data.session.expiresAt).toLocaleDateString('tr-TR');
+      
+      // YENİ EKLEDİĞİM KOD - QR kod içeriğini kontrol et
+      console.log('QR Kod URL:', data.directUrl);
+      showNotification('✅ Yeni QR kod oluşturuldu!', 'success');
+    }
+  } catch (error) {
+    showNotification('❌ QR kod oluşturulamadı: ' + error.message, 'error');
+  }
+}
         
         // İstatistikleri yenile
         async function refreshStats() {
@@ -712,4 +715,5 @@
         }
     </script>
 </body>
+
 </html>
