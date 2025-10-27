@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mekan Müzik Sistemi</title>
+    <title>SohaCafe Müzik Sistemi</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        /* Önceki stilleri koru, sadece eklemeler yap */
         .access-warning {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
@@ -28,85 +28,438 @@
             font-size: 0.8rem;
             z-index: 1000;
         }
+        
+        .gps-request {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            display: none;
+        }
+        
+        .location-loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="venue-status" id="venueStatus">📍 Mekan İçi</div>
     
     <div class="access-warning" id="accessWarning">
-        ⚠️ <strong>Mekan Dışı Erişim!</strong> Sadece mekan içinden müzik isteği yapabilirsiniz.
+        ⚠️ <strong>Erişim Kısıtlandı!</strong> <span id="warningMessage"></span>
     </div>
     
-    <!-- Mevcut içerik burada kalacak -->
+    <div class="gps-request" id="gpsRequest">
+        <h3>📍 Konum Erişimi Gerekli</h3>
+        <p>Mekan içinde olduğunuzu doğrulamak için konum erişimine izin verin.</p>
+        <button class="btn btn-primary" onclick="requestGPSAccess()">Konumumu Paylaş</button>
+        <p class="small-text">Konum bilginiz sadece mekan kontrolü için kullanılır</p>
+    </div>
     
+    <div class="location-loading" id="locationLoading">
+        <div class="spinner"></div>
+        <p>Konumunuz doğrulanıyor...</p>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🎵 SohaCafe Müzik Sistemi</h1>
+            <p>Müzik isteği yap, sıraya ekle!</p>
+        </header>
+
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Şarkı veya sanatçı ara...">
+                <button id="searchBtn">Ara</button>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h3>Arama Sonuçları</h3>
+            <div class="results-grid" id="resultsGrid"></div>
+        </div>
+
+        <div class="queue-section">
+            <h3>🎶 Müzik Kuyruğu <span class="badge" id="queueCount">0</span></h3>
+            <div class="queue-list" id="queueList">
+                <p class="empty-queue">Kuyrukta şarkı yok. İlk şarkıyı sen ekle!</p>
+            </div>
+        </div>
+
+        <div class="current-track" id="currentTrackSection" style="display: none;">
+            <h3>🎵 Şu Anda Çalıyor</h3>
+            <div class="current-track-card" id="currentTrackCard"></div>
+        </div>
+
+        <div class="user-info">
+            <p><strong>Kullanıcı:</strong> <span id="userName">Misafir</span></p>
+            <p><strong>Oturum:</strong> <span id="sessionStatus">Aktif</span></p>
+        </div>
+    </div>
+
     <script>
-        // Mekan erişim kontrolü
-        async function checkVenueAccess() {
+        let currentSessionId = localStorage.getItem('musicQueueSession');
+        let hasGPSAccess = false;
+
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSessionAndAccess();
+            loadQueueStatus();
+            
+            // Her 30 saniyede bir kontrol et
+            setInterval(checkSessionAndAccess, 30000);
+            
+            // Arama butonu event'i
+            document.getElementById('searchBtn').addEventListener('click', searchMusic);
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') searchMusic();
+            });
+        });
+
+        // Oturum ve erişim kontrolü
+        async function checkSessionAndAccess() {
+            if (!currentSessionId) {
+                showAccessWarning('QR kod okutmanız gerekiyor.');
+                return false;
+            }
+
             try {
-                const response = await fetch('/api/session/check');
+                const response = await fetch(`/api/session/check?sessionId=${currentSessionId}`);
                 const data = await response.json();
                 
                 if (!data.isValid) {
                     showAccessWarning('Geçersiz oturum. Lütfen QR kodunu tekrar okutun.');
+                    localStorage.removeItem('musicQueueSession');
+                    currentSessionId = null;
                     return false;
                 }
-                
-                // Erişim testi yap
-                const statusResponse = await fetch('/api/status');
-                if (!statusResponse.ok) {
-                    showAccessWarning('Mekan erişimi yok. Lütfen mekan WiFi\'sına bağlanın.');
+
+                // GPS kontrolü gerekiyorsa
+                if (data.session && !data.session.hasGPSAccess) {
+                    showGPSRequest();
                     return false;
                 }
-                
+
+                hasGPSAccess = true;
                 hideAccessWarning();
+                hideGPSRequest();
+                updateSessionInfo(data.session);
                 return true;
                 
             } catch (error) {
-                showAccessWarning('Mekan erişimi kontrol edilemiyor. WiFi bağlantınızı kontrol edin.');
-                return false;
+                console.error('Erişim kontrol hatası:', error);
+                return true; // Hata durumunda da çalışsın
             }
         }
-        
+
+        // GPS erişim isteği
+        async function requestGPSAccess() {
+            document.getElementById('locationLoading').style.display = 'block';
+            document.getElementById('gpsRequest').style.display = 'none';
+
+            if (!navigator.geolocation) {
+                showAccessWarning('Tarayıcınız konum desteği sağlamıyor.');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    
+                    try {
+                        const response = await fetch('/api/check-gps-access', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                latitude: latitude,
+                                longitude: longitude,
+                                sessionId: currentSessionId
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success && data.isInVenue) {
+                            hasGPSAccess = true;
+                            hideGPSRequest();
+                            showNotification('✅ Konumunuz doğrulandı!', 'success');
+                            loadQueueStatus();
+                        } else {
+                            showAccessWarning(`Mekan dışındasınız (${data.distance}m uzakta).`);
+                        }
+                        
+                    } catch (error) {
+                        showAccessWarning('Konum doğrulama hatası.');
+                    }
+                    
+                    document.getElementById('locationLoading').style.display = 'none';
+                },
+                (error) => {
+                    document.getElementById('locationLoading').style.display = 'none';
+                    document.getElementById('gpsRequest').style.display = 'block';
+                    
+                    if (error.code === error.PERMISSION_DENIED) {
+                        showAccessWarning('Konum erişimi reddedildi. Mekan içinde olduğunuzu doğrulayamıyoruz.');
+                    } else {
+                        showAccessWarning('Konum alınamadı. Lütfen tekrar deneyin.');
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function showGPSRequest() {
+            document.getElementById('gpsRequest').style.display = 'block';
+            document.getElementById('accessWarning').style.display = 'none';
+            document.getElementById('venueStatus').style.background = '#ffc107';
+            document.getElementById('venueStatus').textContent = '📍 Konum Gerekli';
+        }
+
+        function hideGPSRequest() {
+            document.getElementById('gpsRequest').style.display = 'none';
+            document.getElementById('venueStatus').style.background = '#28a745';
+            document.getElementById('venueStatus').textContent = '📍 Mekan İçi';
+        }
+
         function showAccessWarning(message) {
-            const warning = document.getElementById('accessWarning');
-            const status = document.getElementById('venueStatus');
-            
-            warning.innerHTML = `⚠️ <strong>Erişim Kısıtlandı!</strong> ${message}`;
-            warning.style.display = 'block';
-            status.style.background = '#dc3545';
-            status.textContent = '📍 Mekan Dışı';
+            document.getElementById('warningMessage').textContent = message;
+            document.getElementById('accessWarning').style.display = 'block';
+            document.getElementById('venueStatus').style.background = '#dc3545';
+            document.getElementById('venueStatus').textContent = '📍 Mekan Dışı';
         }
-        
+
         function hideAccessWarning() {
-            const warning = document.getElementById('accessWarning');
-            const status = document.getElementById('venueStatus');
-            
-            warning.style.display = 'none';
-            status.style.background = '#28a745';
-            status.textContent = '📍 Mekan İçi';
+            document.getElementById('accessWarning').style.display = 'none';
+            document.getElementById('venueStatus').style.background = '#28a745';
+            document.getElementById('venueStatus').textContent = '📍 Mekan İçi';
         }
+
+        function updateSessionInfo(session) {
+            document.getElementById('sessionStatus').textContent = 'Aktif';
+            if (session.userCount) {
+                document.getElementById('userName').textContent = `Kullanıcı #${session.userCount}`;
+            }
+        }
+
+        // Müzik arama
+        async function searchMusic() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            if (!await checkSessionAndAccess()) return;
+
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': currentSessionId
+                    },
+                    body: JSON.stringify({ query: query, source: 'youtube' })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data.results);
+                } else {
+                    showNotification('Arama başarısız: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Arama hatası:', error);
+                showNotification('Arama sırasında hata oluştu', 'error');
+            }
+        }
+
+        function displayResults(results) {
+            const resultsGrid = document.getElementById('resultsGrid');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            resultsGrid.innerHTML = '';
+            
+            if (results.length === 0) {
+                resultsGrid.innerHTML = '<p class="no-results">Sonuç bulunamadı</p>';
+            } else {
+                results.forEach(track => {
+                    const trackElement = document.createElement('div');
+                    trackElement.className = 'track-card';
+                    trackElement.innerHTML = `
+                        <img src="${track.thumbnail}" alt="${track.title}">
+                        <div class="track-info">
+                            <h4>${track.title}</h4>
+                            <p>${track.artist}</p>
+                            <p class="duration">${track.duration}</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.thumbnail}', '${track.url}')">
+                            Kuyruğa Ekle
+                        </button>
+                    `;
+                    resultsGrid.appendChild(trackElement);
+                });
+            }
+            
+            resultsSection.style.display = 'block';
+        }
+
+        // Kuyruğa ekleme
+        async function addToQueue(trackId, title, artist, thumbnail, url) {
+            if (!await checkSessionAndAccess()) return;
+
+            try {
+                const response = await fetch('/api/queue', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': currentSessionId
+                    },
+                    body: JSON.stringify({
+                        track: {
+                            id: trackId,
+                            title: title,
+                            artist: artist,
+                            thumbnail: thumbnail,
+                            url: url
+                        },
+                        user: document.getElementById('userName').textContent,
+                        source: 'youtube'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('✅ Şarkı kuyruğa eklendi!', 'success');
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('resultsSection').style.display = 'none';
+                } else {
+                    showNotification('❌ Hata: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Kuyruk hatası:', error);
+                showNotification('Kuyruğa ekleme başarısız', 'error');
+            }
+        }
+
+        // Kuyruk durumunu yükle
+        async function loadQueueStatus() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch(`/api/status?sessionId=${currentSessionId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateQueueDisplay(data);
+                }
+            } catch (error) {
+                console.error('Kuyruk yükleme hatası:', error);
+            }
+        }
+
+        function updateQueueDisplay(data) {
+            const queueList = document.getElementById('queueList');
+            const queueCount = document.getElementById('queueCount');
+            const currentTrackSection = document.getElementById('currentTrackSection');
+            const currentTrackCard = document.getElementById('currentTrackCard');
+            
+            // Kuyruk sayısı
+            queueCount.textContent = data.queue.length;
+            
+            // Kuyruk listesi
+            if (data.queue.length === 0) {
+                queueList.innerHTML = '<p class="empty-queue">Kuyrukta şarkı yok. İlk şarkıyı sen ekle!</p>';
+            } else {
+                queueList.innerHTML = data.queue.map((item, index) => `
+                    <div class="queue-item ${index === 0 ? 'current' : ''}">
+                        <div class="queue-number">${index + 1}</div>
+                        <img src="${item.track.thumbnail}" alt="${item.track.title}">
+                        <div class="queue-info">
+                            <h4>${item.track.title}</h4>
+                            <p>${item.track.artist}</p>
+                            <p class="user">${item.user}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // Şu anki şarkı
+            if (data.currentTrack) {
+                currentTrackCard.innerHTML = `
+                    <img src="${data.currentTrack.track.thumbnail}" alt="${data.currentTrack.track.title}">
+                    <div class="track-info">
+                        <h4>${data.currentTrack.track.title}</h4>
+                        <p>${data.currentTrack.track.artist}</p>
+                        <p class="user">${data.currentTrack.user}</p>
+                        <div class="player-controls">
+                            <span class="status">${data.isPlaying ? '🎵 Çalıyor' : '⏸️ Duraklatıldı'}</span>
+                        </div>
+                    </div>
+                `;
+                currentTrackSection.style.display = 'block';
+            } else {
+                currentTrackSection.style.display = 'none';
+            }
+        }
+
+        // Bildirim sistemi
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 600;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            if (type === 'success') {
+                notification.style.background = '#28a745';
+            } else {
+                notification.style.background = '#dc3545';
+            }
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Socket.io ile gerçek zamanlı güncellemeler
+        const socket = io();
         
-        // Sayfa yüklendiğinde kontrol et
-        document.addEventListener('DOMContentLoaded', function() {
-            checkVenueAccess();
-            setInterval(checkVenueAccess, 30000); // 30 saniyede bir kontrol et
+        socket.on('queueUpdate', (data) => {
+            updateQueueDisplay(data);
         });
         
-        // Tüm API isteklerinden önce erişim kontrolü
-        const originalFetch = window.fetch;
-        window.fetch = async function(...args) {
-            const url = args[0];
-            
-            // Session gerektiren endpoint'ler
-            if (url.includes('/api/') && !url.includes('/api/session/check') && !url.includes('/api/status')) {
-                const hasAccess = await checkVenueAccess();
-                if (!hasAccess) {
-                    throw new Error('Mekan erişimi yok');
-                }
-            }
-            
-            return originalFetch.apply(this, args);
-        };
+        socket.on('trackChanged', (data) => {
+            updateQueueDisplay(data);
+            showNotification('🎵 Yeni şarkı başladı: ' + data.currentTrack.track.title, 'success');
+        });
+
+        // Sayfa kapatıldığında session'ı temizle (opsiyonel)
+        window.addEventListener('beforeunload', () => {
+            // Session'ı korumak istiyorsan bu kısmı kaldır
+            // localStorage.removeItem('musicQueueSession');
+        });
     </script>
 </body>
 </html>
