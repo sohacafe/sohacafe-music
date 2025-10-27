@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mekan Yönetim Paneli</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+        
+        /* Mekan Kontrol Stilleri */
+        .venue-controls {
+            background: #e7f3ff;
+            border-left: 4px solid #3182ce;
+        }
+        
+        .status-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .status-active { 
+            background: #48bb78; 
+            color: white; 
+        }
+        
+        .status-inactive { 
+            background: #f56565; 
+            color: white; 
+        }
+        
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .toggle-label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #48bb78;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        /* QR Kod Stilleri */
+        .qr-section {
+            text-align: center;
+        }
+        
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 15px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        #qrCode {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+        
+        .qr-info {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f0fff4;
+            border-radius: 10px;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .session-id {
+            font-family: monospace;
+            background: #2d3748;
+            color: #48bb78;
+            padding: 8px 12px;
+            border-radius: 5px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        
+        /* Buton Stilleri */
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #48bb78;
+        }
+        
+        .btn-success:hover {
+            background: #3fa76d;
+        }
+        
+        .btn-danger {
+            background: #f56565;
+        }
+        
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+        
+        .btn-secondary {
+            background: #718096;
+        }
+        
+        .btn-secondary:hover {
+            background: #4a5568;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        /* Sistem Bilgisi */
+        .system-info {
+            background: #fff5f5;
+            border-left: 4px solid #f56565;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #fed7d7;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #744210;
+        }
+        
+        .info-value {
+            color: #c53030;
+            font-family: monospace;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card {
+                padding: 15px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                margin: 5px 0;
+            }
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background: #48bb78;
+        }
+        
+        .notification.error {
+            background: #f56565;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏢 Mekan Yönetim Paneli</h1>
+            <p>Akıllı Müzik Paylaşım Sistemi - Version 2.0</p>
+        </header>
+        
+        <div class="dashboard">
+            <!-- İstatistikler Kartı -->
+            <div class="card">
+                <h2>📊 Sistem İstatistikleri</h2>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-item">
+                        <span class="stat-number" id="activeUsers">0</span>
+                        <span class="stat-label">Aktif Kullanıcı</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="queueLength">0</span>
+                        <span class="stat-label">Kuyrukta</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="activeSessions">0</span>
+                        <span class="stat-label">Aktif Oturum</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="venueStatus">🟢</span>
+                        <span class="stat-label">Mekan Durumu</span>
+                    </div>
+                </div>
+                
+                <div class="system-info">
+                    <h3>🔧 Sistem Bilgileri</h3>
+                    <div class="info-item">
+                        <span class="info-label">Mekan Kontrolü:</span>
+                        <span class="info-value" id="venueControlStatus">Aktif</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">WiFi Kontrolü:</span>
+                        <span class="info-value" id="wifiControlStatus">Aktif</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">IP Kontrolü:</span>
+                        <span class="info-value" id="ipControlStatus">Aktif</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mekan Kontrol Kartı -->
+            <div class="card venue-controls">
+                <h2>🎯 Mekan Erişim Kontrolü</h2>
+                
+                <div class="status-display">
+                    <span class="status-text">Mekan Erişim Durumu:</span>
+                    <span class="status-badge status-active" id="venueStatusBadge">AKTİF</span>
+                </div>
+                
+                <div class="toggle-group">
+                    <div class="toggle-item">
+                        <span class="toggle-label">Mekan Erişim Kontrolü</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="venueAccessToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="toggle-item">
+                        <span class="toggle-label">WiFi Erişim Kontrolü</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="wifiControlToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="toggle-item">
+                        <span class="toggle-label">IP Erişim Kontrolü</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ipControlToggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="saveSettings()">⚙️ Ayarları Kaydet</button>
+                    <button class="btn btn-secondary" onclick="refreshStats()">🔄 Yenile</button>
+                </div>
+            </div>
+            
+            <!-- QR Kod Kartı -->
+            <div class="card qr-section">
+                <h2>📱 QR Kod Yönetimi</h2>
+                
+                <div class="qr-info">
+                    <p><strong>🎯 SABİT QR KOD SİSTEMİ</strong></p>
+                    <p>Bu QR kod 1 YIL geçerlidir. Müşteriler sadece mekan içindeyken kullanabilir.</p>
+                </div>
+                
+                <div class="qr-container">
+                    <img id="qrCode" src="" alt="QR Code">
+                </div>
+                
+                <div class="session-info">
+                    <p><strong>Oturum ID:</strong></p>
+                    <div class="session-id" id="sessionId">Yükleniyor...</div>
+                    <p><strong>Geçerlilik:</strong> <span id="expiryInfo">1 YIL</span></p>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="generateQRCode()">
+                        🎯 Yeni QR Kod Oluştur
+                    </button>
+                    <button class="btn btn-danger" onclick="resetSystem()">
+                        🚨 Sistemi Sıfırla
+                    </button>
+                    <button class="btn btn-secondary" onclick="copySessionId()">
+                        📋 ID'yi Kopyala
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Hızlı Erişim Kartı -->
+            <div class="card">
+                <h2>🚀 Hızlı Erişim</h2>
+                <div class="action-buttons">
+                    <button class="btn" onclick="openPlayer()">🎵 Müzik Player</button>
+                    <button class="btn" onclick="openUserApp()">📱 Kullanıcı Uygulaması</button>
+                    <button class="btn btn-secondary" onclick="testAccess()">🔍 Erişim Testi</button>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #f7fafc; border-radius: 8px;">
+                    <h4>📖 Kullanım Kılavuzu:</h4>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>Mekan kontrolü AKTİF iken sadece WiFi'ya bağlı cihazlar erişebilir</li>
+                        <li>QR kod her zaman geçerlidir (1 yıl)</li>
+                        <li>Müşteriler mekandan çıkınca otomatik olarak engellenir</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bildirim Sistemi -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        let currentSettings = {};
+        let currentSession = null;
+        
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            generateQRCode();
+            refreshStats();
+            
+            // Her 10 saniyede bir istatistikleri güncelle
+            setInterval(refreshStats, 10000);
+        });
+        
+        // Ayarları yükle
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/admin/settings');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSettings = data.settings;
+                    updateSettingsUI();
+                }
+            } catch (error) {
+                showNotification('Ayarlar yüklenirken hata: ' + error.message, 'error');
+            }
+        }
+        
+        // UI'yı güncelle
+        function updateSettingsUI() {
+            document.getElementById('venueAccessToggle').checked = currentSettings.isActive;
+            document.getElementById('wifiControlToggle').checked = currentSettings.checkWiFi;
+            document.getElementById('ipControlToggle').checked = currentSettings.checkIP;
+            
+            updateStatusBadge();
+        }
+        
+        // Durum badge'ini güncelle
+        function updateStatusBadge() {
+            const badge = document.getElementById('venueStatusBadge');
+            if (currentSettings.isActive) {
+                badge.textContent = 'AKTİF';
+                badge.className = 'status-badge status-active';
+            } else {
+                badge.textContent = 'KAPALI';
+                badge.className = 'status-badge status-inactive';
+            }
+        }
+        
+        // Ayarları kaydet
+        async function saveSettings() {
+            const settings = {
+                isActive: document.getElementById('venueAccessToggle').checked,
+                checkWiFi: document.getElementById('wifiControlToggle').checked,
+                checkIP: document.getElementById('ipControlToggle').checked
+            };
+            
+            try {
+                const response = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSettings = data.settings;
+                    updateStatusBadge();
+                    showNotification('✅ Ayarlar başarıyla kaydedildi!', 'success');
+                } else {
+                    showNotification('❌ Ayarlar kaydedilemedi', 'error');
+                }
+            } catch (error) {
+                showNotification('❌ Kaydetme hatası: ' + error.message, 'error');
+            }
+        }
+        
+        // QR kod oluştur
+        async function generateQRCode() {
+            try {
+                const response = await fetch('/api/qr/generate');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = data.session;
+                    document.getElementById('qrCode').src = data.qrCode;
+                    document.getElementById('sessionId').textContent = data.session.id;
+                    document.getElementById('expiryInfo').textContent = 
+                        new Date(data.session.expiresAt).toLocaleDateString('tr-TR');
+                    
+                    showNotification('✅ Yeni QR kod oluşturuldu!', 'success');
+                }
+            } catch (error) {
+                showNotification('❌ QR kod oluşturulamadı: ' + error.message, 'error');
+            }
+        }
+        
+        // İstatistikleri yenile
+        async function refreshStats() {
+            try {
+                const response = await fetch('/api/admin/statistics');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.statistics;
+                    document.getElementById('activeUsers').textContent = stats.totalUsers;
+                    document.getElementById('queueLength').textContent = stats.queueLength;
+                    document.getElementById('activeSessions').textContent = stats.activeSessions;
+                    document.getElementById('venueStatus').textContent = 
+                        stats.venueStatus.includes('Aktif') ? '🟢' : '🔴';
+                    
+                    // Sistem bilgilerini güncelle
+                    document.getElementById('venueControlStatus').textContent = 
+                        currentSettings.isActive ? 'Aktif' : 'Kapalı';
+                    document.getElementById('wifiControlStatus').textContent = 
+                        currentSettings.checkWiFi ? 'Aktif' : 'Kapalı';
+                    document.getElementById('ipControlStatus').textContent = 
+                        currentSettings.checkIP ? 'Aktif' : 'Kapalı';
+                }
+            } catch (error) {
+                console.error('İstatistik yüklenemedi:', error);
+            }
+        }
+        
+        // Sistemi sıfırla
+        async function resetSystem() {
+            if (confirm('🚨 Tüm oturumlar ve kuyruk temizlenecek. Emin misiniz?')) {
+                try {
+                    const response = await fetch('/api/admin/reset-sessions', {
+                        method: 'POST'
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showNotification('✅ Sistem başarıyla sıfırlandı!', 'success');
+                        refreshStats();
+                    }
+                } catch (error) {
+                    showNotification('❌ Sıfırlama hatası: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        // Session ID kopyala
+        function copySessionId() {
+            if (currentSession) {
+                navigator.clipboard.writeText(currentSession.id)
+                    .then(() => showNotification('✅ Session ID kopyalandı!', 'success'))
+                    .catch(() => showNotification('❌ Kopyalama başarısız', 'error'));
+            }
+        }
+        
+        // Bildirim göster
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Hızlı erişim fonksiyonları
+        function openPlayer() {
+            window.open('/player', '_blank');
+        }
+        
+        function openUserApp() {
+            window.open('/', '_blank');
+        }
+        
+        function testAccess() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('✅ Erişim testi başarılı!', 'success');
+                    } else {
+                        showNotification('❌ Erişim testi başarısız', 'error');
+                    }
+                })
+                .catch(() => {
+                    showNotification('❌ Erişim testi başarısız', 'error');
+                });
+        }
+    </script>
+</body>
+</html>
