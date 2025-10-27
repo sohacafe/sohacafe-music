@@ -62,6 +62,195 @@ function getClientIP(req) {
            req.socket.remoteAddress ||
            (req.connection.socket ? req.connection.socket.remoteAddress : null);
 }
+// ADMIN GÜVENLİK AYARLARI
+const adminSettings = {
+    username: "admin",
+    password: "soha2024", // Varsayılan şifre - değiştirilebilir
+    isLoggedIn: false
+};
+
+// KULLANICI YÖNETİMİ
+const users = new Map();
+
+// Basit admin authentication middleware
+function requireAdminAuth(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'Admin yetkisi gerekiyor' 
+        });
+    }
+    
+    const base64Credentials = authHeader.split(' ')[1];
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+    const [username, password] = credentials.split(':');
+    
+    if (username === adminSettings.username && password === adminSettings.password) {
+        next();
+    } else {
+        return res.status(401).json({ 
+            success: false, 
+            error: 'Geçersiz kullanıcı adı veya şifre' 
+        });
+    }
+}
+
+// Kullanıcı oluşturma
+function createUser(username, password, role = 'user') {
+    const userId = uuidv4();
+    const user = {
+        id: userId,
+        username: username,
+        password: password, // Gerçek uygulamada hash'lenmeli
+        role: role,
+        createdAt: new Date(),
+        isActive: true
+    };
+    
+    users.set(userId, user);
+    return user;
+}
+
+// YENİ ADMIN ENDPOINT'LERİ
+app.post('/api/admin/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (username === adminSettings.username && password === adminSettings.password) {
+        adminSettings.isLoggedIn = true;
+        res.json({ 
+            success: true, 
+            message: 'Giriş başarılı',
+            user: { username: adminSettings.username }
+        });
+    } else {
+        res.status(401).json({ 
+            success: false, 
+            error: 'Geçersiz kullanıcı adı veya şifre' 
+        });
+    }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+    adminSettings.isLoggedIn = false;
+    res.json({ success: true, message: 'Çıkış başarılı' });
+});
+
+// Kullanıcı yönetimi endpoint'leri
+app.get('/api/admin/users', requireAdminAuth, (req, res) => {
+    const userList = Array.from(users.values()).map(user => ({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        createdAt: user.createdAt,
+        isActive: user.isActive
+    }));
+    
+    res.json({ success: true, users: userList });
+});
+
+app.post('/api/admin/users', requireAdminAuth, (req, res) => {
+    const { username, password, role } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Kullanıcı adı ve şifre gerekiyor' 
+        });
+    }
+    
+    // Kullanıcı adı kontrolü
+    const existingUser = Array.from(users.values()).find(u => u.username === username);
+    if (existingUser) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Bu kullanıcı adı zaten kullanılıyor' 
+        });
+    }
+    
+    const user = createUser(username, password, role);
+    
+    res.json({ 
+        success: true, 
+        user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            createdAt: user.createdAt
+        }
+    });
+});
+
+app.put('/api/admin/users/:userId', requireAdminAuth, (req, res) => {
+    const { userId } = req.params;
+    const { username, password, role, isActive } = req.body;
+    
+    const user = users.get(userId);
+    if (!user) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Kullanıcı bulunamadı' 
+        });
+    }
+    
+    if (username) user.username = username;
+    if (password) user.password = password;
+    if (role) user.role = role;
+    if (isActive !== undefined) user.isActive = isActive;
+    
+    res.json({ 
+        success: true, 
+        user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            isActive: user.isActive
+        }
+    });
+});
+
+app.delete('/api/admin/users/:userId', requireAdminAuth, (req, res) => {
+    const { userId } = req.params;
+    
+    if (!users.has(userId)) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Kullanıcı bulunamadı' 
+        });
+    }
+    
+    users.delete(userId);
+    res.json({ success: true, message: 'Kullanıcı silindi' });
+});
+
+// Admin şifre değiştirme
+app.post('/api/admin/change-password', requireAdminAuth, (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (currentPassword !== adminSettings.password) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Mevcut şifre yanlış' 
+        });
+    }
+    
+    adminSettings.password = newPassword;
+    res.json({ success: true, message: 'Şifre başarıyla değiştirildi' });
+});
+
+// GÜNCEL HTML ROUTES with authentication
+app.get('/admin/qr', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/qr-admin.html'));
+});
+
+app.get('/admin/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/admin-login.html'));
+});
+
+app.get('/admin/users', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/user-management.html'));
+});
 
 // GPS mesafe hesaplama
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -697,3 +886,4 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 URL: https://sohacafe.onrender.com`);
   console.log(`📍 Port: ${PORT}`);
 });
+
