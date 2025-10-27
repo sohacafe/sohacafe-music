@@ -26,17 +26,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 const YOUTUBE_API_KEY = 'AIzaSyC-z8ZrVVJZUUIlqws2ltZfSlzjD9OnGuQ';
 const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3';
 
-// MEKAN AYARLARI
+// MEKAN AYARLARI - GELİŞMİŞ
 const venueSettings = {
     isActive: true,
-    wifiSSID: "Mekan_WiFi",
+    controlMethod: 'gps', // 'gps', 'wifi', 'none'
+    wifiSSID: "SohaCafe_WiFi",
     allowedIPRange: ["192.168.1", "10.0.0", "172.16.0"],
+    venueLocation: {
+        lat: 41.0082, // Mekan enlem - ADMIN'DEN AYARLANACAK
+        lng: 28.9784, // Mekan boylam - ADMIN'DEN AYARLANACAK
+        radius: 100 // Metre cinsinden
+    },
     checkWiFi: true,
-    checkIP: true
+    checkIP: true,
+    checkGPS: true
 };
 
 const sessions = new Map();
-const QR_EXPIRY_TIME = 365 * 24 * 60 * 60 * 1000;
+const QR_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 saat
 
 let queue = [];
 let currentTrack = null;
@@ -56,13 +63,27 @@ function getClientIP(req) {
            (req.connection.socket ? req.connection.socket.remoteAddress : null);
 }
 
+// GPS mesafe hesaplama
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Dünya yarıçapı metre
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// Gelişmiş mekan erişim kontrolü
 function checkVenueAccess(req) {
     if (!venueSettings.isActive) return true;
     
     const clientIP = getClientIP(req);
-    console.log('📍 Erişim kontrolü - IP:', clientIP);
     
-    if (venueSettings.checkIP) {
+    // IP kontrolü
+    if (venueSettings.checkIP && venueSettings.controlMethod !== 'gps') {
         const isInVenue = venueSettings.allowedIPRange.some(ip => clientIP.startsWith(ip));
         if (!isInVenue) {
             console.log('🚫 Erişim reddedildi - IP uyumsuz:', clientIP);
@@ -72,6 +93,41 @@ function checkVenueAccess(req) {
     
     return true;
 }
+
+// GPS erişim kontrolü API endpoint'i
+app.post('/api/check-gps-access', async (req, res) => {
+    const { latitude, longitude, sessionId } = req.body;
+    
+    if (!latitude || !longitude) {
+        return res.json({ success: false, error: 'Konum bilgisi gerekli' });
+    }
+    
+    const session = sessions.get(sessionId);
+    if (!session || !session.isValid) {
+        return res.json({ success: false, error: 'Geçersiz oturum' });
+    }
+    
+    const distance = calculateDistance(
+        latitude, 
+        longitude, 
+        venueSettings.venueLocation.lat, 
+        venueSettings.venueLocation.lng
+    );
+    
+    const isInVenue = distance <= venueSettings.venueLocation.radius;
+    
+    if (isInVenue) {
+        session.hasGPSAccess = true;
+        console.log('📍 GPS Erişim onaylandı:', distance.toFixed(1) + 'm');
+    }
+    
+    res.json({ 
+        success: true, 
+        isInVenue, 
+        distance: Math.round(distance),
+        radius: venueSettings.venueLocation.radius
+    });
+});
 
 function checkRateLimit(userId, type) {
   const now = Date.now();
@@ -162,11 +218,12 @@ function createSession() {
     expiresAt: new Date(expiryTime),
     isValid: true,
     userCount: 0,
-    isPermanent: true
+    hasGPSAccess: false,
+    isPermanent: false
   };
   
   sessions.set(sessionId, session);
-  console.log('✅ SABİT QR oluşturuldu:', sessionId);
+  console.log('✅ QR oturumu oluşturuldu:', sessionId);
   
   return session;
 }
@@ -202,6 +259,14 @@ function requireValidSession(req, res, next) {
     return res.status(403).json({ 
       success: false,
       error: 'Oturum süresi dolmuş. Lütfen yeni QR kodu okutun.' 
+    });
+  }
+  
+  // GPS kontrolü aktifse ve erişim yoksa
+  if (venueSettings.isActive && venueSettings.controlMethod === 'gps' && !session.hasGPSAccess) {
+    return res.status(403).json({ 
+      success: false,
+      error: 'GPS konum doğrulaması gerekiyor. Lütfen konum paylaşın.' 
     });
   }
   
@@ -273,18 +338,24 @@ function getMockResults(query) {
   ];
 }
 
-// ADMIN ENDPOINTS
+// GELİŞMİŞ ADMIN ENDPOINT'LERİ
 app.get('/api/admin/settings', (req, res) => {
     res.json({ success: true, settings: venueSettings });
 });
 
 app.post('/api/admin/settings', (req, res) => {
-    const { isActive, wifiSSID, checkWiFi, checkIP } = req.body;
+    const { isActive, controlMethod, wifiSSID, checkWiFi, checkIP, checkGPS, venueLocation } = req.body;
     
     venueSettings.isActive = isActive !== undefined ? isActive : venueSettings.isActive;
+    venueSettings.controlMethod = controlMethod || venueSettings.controlMethod;
     venueSettings.wifiSSID = wifiSSID || venueSettings.wifiSSID;
     venueSettings.checkWiFi = checkWiFi !== undefined ? checkWiFi : venueSettings.checkWiFi;
     venueSettings.checkIP = checkIP !== undefined ? checkIP : venueSettings.checkIP;
+    venueSettings.checkGPS = checkGPS !== undefined ? checkGPS : venueSettings.checkGPS;
+    
+    if (venueLocation) {
+        venueSettings.venueLocation = { ...venueSettings.venueLocation, ...venueLocation };
+    }
     
     console.log('🔧 Admin ayarları güncellendi:', venueSettings);
     res.json({ success: true, settings: venueSettings });
@@ -293,15 +364,18 @@ app.post('/api/admin/settings', (req, res) => {
 app.get('/api/admin/statistics', (req, res) => {
     const activeSessions = Array.from(sessions.values()).filter(s => s.isValid).length;
     const totalUsers = Array.from(sessions.values()).filter(s => s.isValid).reduce((sum, s) => sum + s.userCount, 0);
+    const gpsVerified = Array.from(sessions.values()).filter(s => s.hasGPSAccess).length;
     
     res.json({
         success: true,
         statistics: {
             activeSessions,
             totalUsers,
+            gpsVerified,
             queueLength: queue.length,
             isPlaying: isPlaying,
-            venueStatus: venueSettings.isActive ? '🟢 Aktif' : '🔴 Kapalı'
+            venueStatus: venueSettings.isActive ? '🟢 Aktif' : '🔴 Kapalı',
+            controlMethod: venueSettings.controlMethod
         }
     });
 });
@@ -316,18 +390,14 @@ app.post('/api/admin/reset-sessions', (req, res) => {
     res.json({ success: true, message: 'Tüm oturumlar temizlendi' });
 });
 
-// QR KOD API
+// DÜZGÜN QR KOD API - SADECE URL!
 app.get('/api/qr/generate', async (req, res) => {
   try {
     const session = createSession();
-    const qrData = {
-      sessionId: session.id,
-      action: 'join-venue',
-      timestamp: Date.now(),
-      baseUrl: `https://sohacafe.onrender.com` // BU SATIRI KONTROL ET!
-    };
+    const directUrl = `https://sohacafe.onrender.com/join/${session.id}`;
     
-    const qrCodeUrl = await QRCode.toDataURL(JSON.stringify(qrData));
+    // SADECE DIRECT URL'yi QR kod yap
+    const qrCodeUrl = await QRCode.toDataURL(directUrl);
     
     res.json({
       success: true,
@@ -338,7 +408,7 @@ app.get('/api/qr/generate', async (req, res) => {
         isValid: session.isValid
       },
       qrCode: qrCodeUrl,
-      directUrl: `https://sohacafe.onrender.com/join/${session.id}`, // BU DA
+      directUrl: directUrl,
       expiryTime: session.expiresAt
     });
   } catch (error) {
@@ -358,9 +428,16 @@ app.get('/join/:sessionId', (req, res) => {
     return res.send(`
       <!DOCTYPE html>
       <html>
-      <head><title>Geçersiz QR Kod</title></head>
+      <head>
+        <title>Geçersiz QR Kod</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial; text-align: center; padding: 50px; }
+          .error { color: #dc3545; font-size: 24px; }
+        </style>
+      </head>
       <body>
-        <h2>❌ Geçersiz QR Kod</h2>
+        <div class="error">❌ Geçersiz QR Kod</div>
         <p>Lütfen yeni QR kod alın.</p>
       </body>
       </html>
@@ -372,9 +449,16 @@ app.get('/join/:sessionId', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
-    <head><title>Hoş Geldiniz</title></head>
+    <head>
+      <title>Hoş Geldiniz</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: Arial; text-align: center; padding: 50px; }
+        .success { color: #28a745; font-size: 24px; }
+      </style>
+    </head>
     <body>
-      <h2>✅ Hoş Geldiniz!</h2>
+      <div class="success">✅ Hoş Geldiniz!</div>
       <p>Yönlendiriliyorsunuz...</p>
       <script>
         localStorage.setItem('musicQueueSession', '${sessionId}');
@@ -415,7 +499,8 @@ app.get('/api/session/check', (req, res) => {
       id: session.id,
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
-      userCount: session.userCount
+      userCount: session.userCount,
+      hasGPSAccess: session.hasGPSAccess
     }
   });
 });
@@ -436,7 +521,7 @@ app.post('/api/search', requireValidSession, async (req, res) => {
   if (!checkVenueAccess(req)) {
     return res.status(403).json({ 
       success: false,
-      error: '🚫 Sadece mekan içinden erişebilirsiniz. Lütfen mekan WiFi\'sına bağlanın.' 
+      error: '🚫 Sadece mekan içinden erişebilirsiniz.' 
     });
   }
 
@@ -480,7 +565,7 @@ app.post('/api/queue', requireValidSession, async (req, res) => {
   if (!checkVenueAccess(req)) {
     return res.status(403).json({ 
       success: false,
-      error: '🚫 Sadece mekan içinden erişebilirsiniz. Lütfen mekan WiFi\'sına bağlanın.' 
+      error: '🚫 Sadece mekan içinden erişebilirsiniz.' 
     });
   }
 
@@ -610,6 +695,5 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎵 SOHACAFE MÜZİK SİSTEMİ RENDER'DA ÇALIŞIYOR!`);
   console.log(`📱 URL: https://sohacafe.onrender.com`);
+  console.log(`📍 Port: ${PORT}`);
 });
-
-
